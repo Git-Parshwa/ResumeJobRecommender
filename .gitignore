@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdf
+*.docx
+*.DS_Store
+.env
+venv/
+temp_resume.pdf
+resumes/
+scraped_jobs.csv
