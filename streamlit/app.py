@@ -1,10 +1,30 @@
 import streamlit as st
+import requests
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),'..','aiml-api')))
+
 from loadResume import extract_resume_info
-from jobMatcher import match_resume_to_jobs
 
 st.set_page_config(layout="wide")
 st.title("AI Resume Job Recommender")
 st.divider()
+
+if "token" not in st.session_state:
+    st.session_state.token=None
+
+if st.session_state.token is None:
+    username=st.text_input("Username")
+    password=st.text_input("Password",type="password")
+    if st.button("Login"):
+        res=requests.post("http://localhost:5000/api/login",json={"username":username,"password":password})
+        if res.status_code==200:
+            st.session_state.token=res.json()["token"]
+            st.success("User Logged In")
+        else:
+            st.error("Incorrect Username or Password")
+    st.stop()
 
 st.sidebar.title("Controls")
 st.sidebar.markdown("Upload your resume on the left and view job matches on the right.")
@@ -46,11 +66,22 @@ with col2:
     st.subheader("Recommended Jobs")
     if uploaded_file:
         st.success("Top Job Recommendations...")
-        results=match_resume_to_jobs(f"resumes/{uploaded_file.name}",top_n=top_n)
 
-        for _,row in results.iterrows():
-            st.markdown(f"### [{row['title']}]({row['link']}) at {row['company']}")
-            st.write(f"**Tags:** {row['tags']}")
-            st.markdown("---")
+        try:
+            resume_path = os.path.join("resumes", uploaded_file.name)
+            files={"file":open(resume_path,"rb")}
+            headers={"Authorization":f"Bearer {st.session_state.token}"}
+            response=requests.post(f"http://localhost:8000/recommend_jobs?top_n={top_n}",files=files,headers=headers)
+
+            if response.status_code==200:
+                jobs=response.json()
+                for job in jobs:
+                    st.markdown(f"### [{job['title']}]({job['link']}) at {job['company']}")
+                    st.write(f"**Tags:** {job['tags']}")
+                    st.markdown("---")
+            else:
+                st.error(f"Failed to Fetch Jobs: {response.status_code}-{response.text}")
+        except Exception as e:
+            st.error(f"Unkonwn Error: {e}")
     else:
         st.info("Upload a Resume to view Job Recommendations")
